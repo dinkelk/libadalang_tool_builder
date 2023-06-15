@@ -1,0 +1,12 @@
+name = "libadalang_tool_builder"
+description = "Helper to compile libadalang tools and gnatprove"
+version = "0.1.0-dev"
+
+authors = ["Kevin Dinkel"]
+maintainers = ["Kevin Dinkel <kevin@dinkelcloud.com>"]
+maintainers-logins = ["dinkelk"]
+
+executables = ["libadalang_tool_builder"]
+
+[[depends-on]]
+libadalang_tools = "23.0.0"
