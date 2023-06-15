@@ -1,8 +1,10 @@
 # Libadalang Tool Builder
 
-A little crate that uses Alire to download the libadalang-tools source code and install the tools, ie. `gnatpp` and `gnatmetric` to a desired location. You can then remove this repository once the install is complete.
+This little crate uses [Alire](https://alire.ada.dev/) to download the libadalang-tools source code, build, and install tools like `gnatpp` and `gnatmetric` to a desired location.
 
 ### How to build and install:
+
+To build:
 
 ```
 $ alr build --release
