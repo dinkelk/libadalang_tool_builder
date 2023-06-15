@@ -13,7 +13,7 @@ $ alr build --release
 This can take a while. Install the binaries by running:
 
 ```
-$ install.sh /path/to/destination/bin
+$ sh install.sh /path/to/destination/bin
 ```
 
 ### How this crate was first constructed:
