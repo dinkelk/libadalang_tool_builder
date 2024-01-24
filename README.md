@@ -16,6 +16,8 @@ This can take a while. Install the binaries by running:
 $ sh install.sh /path/to/destination/bin
 ```
 
+Alternatively, there is a [Dockerfile](docker/) available with the libadalang tools preinstalled.
+
 ### How this repository was first constructed:
 
 ```
