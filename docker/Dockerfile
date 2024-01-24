@@ -55,8 +55,8 @@ RUN mkdir -p /root/libadalang \
 # Construct the final image from the multi-step build images above:
 FROM base AS final
 LABEL org.opencontainers.image.source=https://github.com/dinkelk/libadalang_tool_builder
-LABEL org.opencontainers.image.description="libadalang_tools builder"
-LABEL org.opencontainers.image.licenses=Apache-2.0
+LABEL org.opencontainers.image.description="libadalang-tools builder"
+LABEL org.opencontainers.image.licenses=MIT
 COPY --from=install_alire /root/alire/bin/alr $BIN_DIR
 COPY --from=install_libadalang /root/libadalang/libadalang_tool_builder/tools/* $BIN_DIR
 
