@@ -1,0 +1,14 @@
+name: libadalang_tool_builder
+services:
+    libadalang_tool_builder:
+        image: ghcr.io/dinkelk/libadalang_tool_builder:latest
+        build:
+            context: ..
+            dockerfile: docker/Dockerfile
+        platform: linux/amd64
+        container_name: libadalang_tool_builder_container
+        volumes:
+            - type: bind
+              source: ../../libadalang_tool_builder
+              target: /root/libadalang/libadalang_tool_builder
+        command: sleep infinity
