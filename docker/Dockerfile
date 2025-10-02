@@ -1,13 +1,13 @@
 #
-# This Dockerfile needs to be run from within the project/ directory (AKA ../../ from here)
-# so that docker has access to all the files it needs. ie.
+# This Dockerfile copies the repository contents from disk to build with the latest code.
+# It should be run with the repository root as the build context:
 #
-# $ docker build -t $DOCKER_IMAGE_NAME -f libadalang_tool_builder/docker/Dockerfile .
+# $ cd libadalang_tool_builder
+# $ docker build -t $IMAGE_NAME -f docker/Dockerfile .
 #
-# For best results use the ./build_image.sh and ./create_container.sh scripts
-# provided in this directory.
+# For best results use docker-compose or the ./env.sh script in the docker/ directory.
 #
-FROM ubuntu:22.04 AS base
+FROM ubuntu:24.04 AS base
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -31,7 +31,7 @@ ENV BIN_DIR=/usr/local/bin
 
 # Install Alire:
 FROM base AS install_alire
-ENV ALIRE_VERSION="1.2.2"
+ENV ALIRE_VERSION="2.1.0"
 ENV ALIRE_FILE=alr-$ALIRE_VERSION-bin-x86_64-linux.zip
 ENV ALIRE_URL=https://github.com/alire-project/alire/releases/download/v$ALIRE_VERSION/$ALIRE_FILE
 RUN DEBIAN_FRONTEND=noninteractive apt-get install -yq wget unzip \
@@ -44,13 +44,16 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get install -yq wget unzip \
 
 # Install GNAT tools like gnatpp and gnatmetric:
 FROM install_alire AS install_libadalang
-RUN mkdir -p /root/libadalang \
-    && cd /root/libadalang \
-    && git clone https://github.com/dinkelk/libadalang_tool_builder.git \
-    && cd libadalang_tool_builder \
-    && alr -n build --release \
-    && mkdir tools \
-    && sh install.sh tools
+RUN mkdir -p /root/libadalang
+RUN cd /root/libadalang \
+    && alr index --update-all \
+    && alr -n get libadalang_tools=23.0.0 \
+    && cd libadalang_tools* \
+    && echo '' >> alire.toml \
+    && echo '[[depends-on]]' >> alire.toml \
+    && echo 'gnat = "^13.0"' >> alire.toml \
+    && alr -n -v build --release
+RUN mkdir -p /root/libadalang/libadalang_tool_builder/tools/
 
 # Construct the final image from the multi-step build images above:
 FROM base AS final
@@ -58,7 +61,8 @@ LABEL org.opencontainers.image.source=https://github.com/dinkelk/libadalang_tool
 LABEL org.opencontainers.image.description="libadalang-tools builder"
 LABEL org.opencontainers.image.licenses=MIT
 COPY --from=install_alire /root/alire/bin/alr $BIN_DIR
-COPY --from=install_libadalang /root/libadalang/libadalang_tool_builder/tools/* $BIN_DIR
+COPY --from=install_libadalang /root/libadalang/libadalang_tools*/bin/* $BIN_DIR
+COPY --from=install_libadalang /root/libadalang/libadalang_tools*/bin/* /root/libadalang/libadalang_tool_builder/tools/
 
 # Make sure user is root at end.
 USER root
