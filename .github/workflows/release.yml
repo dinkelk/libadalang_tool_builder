@@ -1,0 +1,148 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag (e.g., v1.0.0)'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build for ${{ matrix.platform }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        platform: [linux-amd64, linux-arm64]
+        include:
+          - platform: linux-amd64
+            docker_platform: linux/amd64
+            arch: amd64
+          - platform: linux-arm64
+            docker_platform: linux/arm64
+            arch: arm64
+
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU for cross-platform builds
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build libadalang-tools for ${{ matrix.platform }}
+        run: |
+          docker buildx build \
+            --platform ${{ matrix.docker_platform }} \
+            --load \
+            -t libadalang-tools-build-${{ matrix.arch }} \
+            -f docker/Dockerfile \
+            .
+
+      - name: Extract binaries from Docker image
+        run: |
+          # Create container from image
+          CONTAINER_ID=$(docker create --platform ${{ matrix.docker_platform }} libadalang-tools-build-${{ matrix.arch }})
+
+          # Copy binaries out
+          docker cp $CONTAINER_ID:/root/libadalang/libadalang_tool_builder/tools ./libadalang-tools-${{ matrix.arch }}
+
+          # Cleanup
+          docker rm $CONTAINER_ID
+
+      - name: Create release archive
+        run: |
+          cd libadalang-tools-${{ matrix.arch }}
+          tar -czf ../libadalang-tools-${{ matrix.platform }}.tar.gz *
+          cd ..
+          sha256sum libadalang-tools-${{ matrix.platform }}.tar.gz > libadalang-tools-${{ matrix.platform }}.tar.gz.sha256
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: libadalang-tools-${{ matrix.platform }}
+          path: |
+            libadalang-tools-${{ matrix.platform }}.tar.gz
+            libadalang-tools-${{ matrix.platform }}.tar.gz.sha256
+
+  release:
+    name: Create GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Prepare release assets
+        run: |
+          mkdir -p release-assets
+          find artifacts -name "*.tar.gz*" -exec cp {} release-assets/ \;
+          ls -la release-assets/
+
+      - name: Determine release tag
+        id: tag
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "tag=${{ inputs.tag }}" >> $GITHUB_OUTPUT
+          else
+            echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ steps.tag.outputs.tag }}
+          name: Release ${{ steps.tag.outputs.tag }}
+          draft: false
+          prerelease: false
+          files: release-assets/*
+          body: |
+            ## Release ${{ steps.tag.outputs.tag }}
+
+            ### Binaries Included
+
+            This release includes the following libadalang-tools binaries:
+            - `gnatpp` - Ada code pretty-printer
+            - `gnatmetric` - Ada code metrics tool
+            - `gnattest` - Ada unit test generator
+            - `gnatstub` - Ada stub generator
+            - And other libadalang-tools utilities
+
+            ### Installation
+
+            Download the appropriate archive for your platform:
+            - `libadalang-tools-linux-amd64.tar.gz` - Linux x86_64
+            - `libadalang-tools-linux-arm64.tar.gz` - Linux ARM64
+
+            ```bash
+            # Download and extract (replace PLATFORM with your platform)
+            curl -LO https://github.com/${{ github.repository }}/releases/download/${{ steps.tag.outputs.tag }}/libadalang-tools-PLATFORM.tar.gz
+            tar -xzf libadalang-tools-PLATFORM.tar.gz
+
+            # Optionally, move to a directory in your PATH
+            sudo mv gnatpp gnatmetric gnattest gnatstub /usr/local/bin/
+            ```
+
+            ### Verification
+
+            SHA256 checksums are provided for each archive:
+            ```bash
+            sha256sum -c libadalang-tools-PLATFORM.tar.gz.sha256
+            ```
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

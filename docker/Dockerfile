@@ -31,12 +31,18 @@ ENV BIN_DIR=/usr/local/bin
 
 # Install Alire:
 FROM base AS install_alire
+ARG TARGETARCH
 ENV ALIRE_VERSION="2.1.0"
-ENV ALIRE_FILE=alr-$ALIRE_VERSION-bin-x86_64-linux.zip
-ENV ALIRE_URL=https://github.com/alire-project/alire/releases/download/v$ALIRE_VERSION/$ALIRE_FILE
 RUN DEBIAN_FRONTEND=noninteractive apt-get install -yq wget unzip \
     && mkdir -p /root/alire \
     && cd /root/alire \
+    && if [ "$TARGETARCH" = "arm64" ]; then \
+         ALIRE_ARCH="aarch64"; \
+       else \
+         ALIRE_ARCH="x86_64"; \
+       fi \
+    && ALIRE_FILE="alr-${ALIRE_VERSION}-bin-${ALIRE_ARCH}-linux.zip" \
+    && ALIRE_URL="https://github.com/alire-project/alire/releases/download/v${ALIRE_VERSION}/${ALIRE_FILE}" \
     && wget $ALIRE_URL \
     && rm -rf bin \
     && unzip $ALIRE_FILE \
@@ -47,11 +53,11 @@ FROM install_alire AS install_libadalang
 RUN mkdir -p /root/libadalang
 RUN cd /root/libadalang \
     && alr index --update-all \
+    && alr -n toolchain --select gnat_native \
+    && alr -n toolchain --select gprbuild \
     && alr -n get libadalang_tools=23.0.0 \
     && cd libadalang_tools* \
-    && echo '' >> alire.toml \
-    && echo '[[depends-on]]' >> alire.toml \
-    && echo 'gnat = "^13.0"' >> alire.toml \
+    && find . -name "*.gpr" -exec sed -i -e 's/-gnatwe/-gnatw/g' -e 's/-gnatwae/-gnatwa/g' {} \; \
     && alr -n -v build --release
 RUN mkdir -p /root/libadalang/libadalang_tool_builder/tools/
 
