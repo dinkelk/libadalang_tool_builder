@@ -10,3 +10,4 @@ executables = ["libadalang_tool_builder"]
 
 [[depends-on]]
 libadalang_tools = "23.0.0"
+gnat = "^13.0"
