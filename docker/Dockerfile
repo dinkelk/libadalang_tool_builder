@@ -50,14 +50,16 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get install -yq wget unzip \
 
 # Install GNAT tools like gnatpp and gnatmetric:
 FROM install_alire AS install_libadalang
-RUN mkdir -p /root/libadalang
-RUN cd /root/libadalang \
+COPY alire.toml /root/libadalang_tool_builder/alire.toml
+COPY src /root/libadalang_tool_builder/src
+COPY libadalang_tool_builder.gpr /root/libadalang_tool_builder/libadalang_tool_builder.gpr
+RUN cd /root/libadalang_tool_builder \
     && alr index --update-all \
     && alr -n toolchain --select gnat_native \
     && alr -n toolchain --select gprbuild \
-    && alr -n get libadalang_tools=23.0.0 \
-    && cd libadalang_tools* \
-    && find . -name "*.gpr" -exec sed -i -e 's/-gnatwe/-gnatw/g' -e 's/-gnatwae/-gnatwa/g' {} \; \
+    && alr -n update \
+    && find /root/.local/share/alire/builds/libadalang_tools*/*/src/ -name "*.gpr" -exec sed -i 's/-gnatwe//g' {} \; \
+    && find /root/.local/share/alire/builds/libadalang_tools*/*/src/ -name "*.gpr" -exec sed -i 's/-gnatwae//g' {} \; \
     && alr -n -v build --release
 RUN mkdir -p /root/libadalang/libadalang_tool_builder/tools/
 
@@ -67,8 +69,8 @@ LABEL org.opencontainers.image.source=https://github.com/dinkelk/libadalang_tool
 LABEL org.opencontainers.image.description="libadalang-tools builder"
 LABEL org.opencontainers.image.licenses=MIT
 COPY --from=install_alire /root/alire/bin/alr $BIN_DIR
-COPY --from=install_libadalang /root/libadalang/libadalang_tools*/bin/* $BIN_DIR
-COPY --from=install_libadalang /root/libadalang/libadalang_tools*/bin/* /root/libadalang/libadalang_tool_builder/tools/
+COPY --from=install_libadalang /root/.local/share/alire/builds/libadalang_tools*/*/bin/* $BIN_DIR
+COPY --from=install_libadalang /root/.local/share/alire/builds/libadalang_tools*/*/bin/* /root/libadalang/libadalang_tool_builder/tools/
 
 # Make sure user is root at end.
 USER root
